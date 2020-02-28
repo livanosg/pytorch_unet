@@ -15,6 +15,7 @@ def one_hot(indices, num_classes):
     return onehot_labels
 
 
+# noinspection PyShadowingBuiltins
 def metrics_writer(writer, mode, input, onehot_label, output, metrics, model, global_step):
     input = (input - input.min()) / (input.max() - input.min())
     output = torch.unsqueeze(torch.argmax(output, dim=1), dim=1)
@@ -68,6 +69,8 @@ def load_ckp(checkpoint_fpath, model, optimizer):
     valid_loss_min = checkpoint['valid_loss_min']
     # return model, optimizer, epoch value, min validation loss
     return model, optimizer, checkpoint['epoch'], valid_loss_min.item()
+
+
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 

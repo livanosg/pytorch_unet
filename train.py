@@ -173,6 +173,7 @@ def train_model(args):
                            output=val_outputs, metrics=val_metrics, model=model, global_step=global_step)
 
         early_stopping(val_metric=val_metrics['loss'], minimize=True, checkpoint=checkpoint, model_root=model_root, epoch=epoch)
+        # noinspection PyArgumentList
         scheduler.step()
     writer.close()
     print('Training finished without facing early stopping criteria')

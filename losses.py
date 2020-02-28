@@ -9,10 +9,16 @@ class WeightedCrossEntropyLoss(Module):
         super().__init__()
 
     def forward(self, output, onehot_labels):
+        """
+
+        :param output: output with shape bchw
+        :param onehot_labels: onehot labels with shape bchw
+        :type onehot_labels: tensor
+        """
         num_classes = output.shape[1]
         class_frequencies = torch.sum(onehot_labels, dim=(0, 2, 3))
         # Data balancing
-        weights = torch.div(torch.sum(class_frequencies), torch.add(torch.mul(class_frequencies, num_classes),eps))
+        weights = torch.div(torch.sum(class_frequencies), torch.add(torch.mul(class_frequencies, num_classes), eps))
         weights = weights.view([-1, 2, 1, 1])
         weight_map = torch.mul(onehot_labels, weights)
         weight_map = torch.sum(weight_map, dim=1, keepdim=True)
@@ -28,10 +34,10 @@ class WeightedDiceLoss(Module):
 
     def forward(self, output, onehot_label):
         class_frequencies = torch.sum(onehot_label, dim=(0, 2, 3))
-        weights = torch.div(1., torch.pow(class_frequencies, 2) + eps)
+        weights = torch.div(1., torch.add(torch.pow(class_frequencies, 2.), eps))
         weights.requires_grad = False
         weights = weights.to(output.device)
-        numerator = torch.sum(output * onehot_label, dim=(0, 2, 3))
+        numerator = torch.sum(torch.mul(output, onehot_label), dim=(0, 2, 3))
         numerator = 2.0 * torch.sum(weights * numerator)
         denominator = torch.sum(onehot_label + output, dim=(0, 2, 3))
         denominator = torch.sum(weights * denominator)

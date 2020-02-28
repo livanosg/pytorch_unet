@@ -19,11 +19,9 @@ class DiceScore(Module):
         # F1 micro
         if self.dice_type == 'micro':
             f1 = torch.div(torch.mul(numerator, 2.0), torch.add(denominator, eps))
-
         # F1 macro
         elif self.dice_type == 'macro':
             f1 = torch.div(2.0 * torch.sum(numerator), torch.sum(torch.add(denominator, eps)))
-
         # F1 weighted
         elif self.dice_type == 'weighted':
             num_classes = output_nograd.shape[1]

@@ -2,7 +2,7 @@ import argparse
 from train import train_model
 
 parser = argparse.ArgumentParser(description='Train a model according to given hyperparameters.')
-parser.add_argument('-m', '--model', type=str, default='unet', choices=['unet', 'ynet'], help='Select model architecture.')
+parser.add_argument('-m', '--model', type=str, default='unet', choices=('unet', 'ynet'), help='Select model architecture.')
 parser.add_argument('-branch', '--branch_to_train', type=int, default=1, choices=[1, 2], help='Set training branch in ynet.')
 parser.add_argument('-dr', '--dropout', type=float, default=0.5, help='Learning Rate.')
 
