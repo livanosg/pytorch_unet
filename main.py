@@ -15,6 +15,7 @@ parser.add_argument('-lr', '--learning_rate', type=float, default=0.0001, help='
 parser.add_argument('-decay', '--decay', type=float, default=0.1, help='Decay of learning rate per decay_epochs. new_learning_rate = learning_rate * decay')
 parser.add_argument('-de', '--decay_epochs', type=int, default=100, help='epochs to reach the learning_rate * decay value.')
 parser.add_argument('-load', '--load_model', type=str, default='', help='The name of the folder a model is saved. If declared, The model will be loaded.')
+parser.add_argument('-best', '--best', type=int, default=0, help='Set to 1 to load best model of load_model folder.')
 parser.add_argument('-logs', '--logs_per_epoch', type=int, default=2, help='How many times will Log training metrics in every epoch.')
 
 

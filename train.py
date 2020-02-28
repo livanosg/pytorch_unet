@@ -2,7 +2,7 @@ import os
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from config import paths
-from helper_fns import metrics_writer, EarlyStopping
+from helper_fns import metrics_writer, EarlyStopping, load_ckp
 from metrics import DiceScore
 from models import Ynet, Unet
 from losses import custom_loss
@@ -50,11 +50,11 @@ def train_model(args):
     else:
         return NotImplementedError('Model {} is not implemented'.format(args.model))
 
-    early_stopping = EarlyStopping(patience=args.early_stopping_epochs)
-
     # Declare data
-    train_loader = dataloader(mode='train', branch_to_train=args.branch_to_train, num_classes=args.classes, batch_size=total_batch)
-    val_loader = dataloader(mode='eval', branch_to_train=args.branch_to_train, num_classes=args.classes, batch_size=total_batch)
+    train_loader = dataloader(mode='train', branch_to_train=args.branch_to_train, num_classes=args.classes,
+                              batch_size=total_batch)
+    val_loader = dataloader(mode='eval', branch_to_train=args.branch_to_train, num_classes=args.classes,
+                            batch_size=total_batch)
 
     # Declare optimizer and learning rate decay
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.learning_rate)
@@ -65,14 +65,22 @@ def train_model(args):
     logs_step = len(train_loader) // args.logs_per_epoch
 
     # define model save path
-    trial = 0
     model_path = paths['save_model'] + '/' + args.model
-    while os.path.exists(model_path + '_trial_{}'.format(trial)):
-        trial += 1
-    model_root = model_path + '_trial_{}'.format(trial)
-
+    if args.load_model:
+        if args.best == 1:
+            checkpoint = '/best'
+        else:
+            checkpoint = '/checkpoint'
+        model_trial = model_path + args.load
+        model, optimizer, loaded_epoch, val_loss = load_ckp(model_trial + checkpoint, model=model, optimizer=optimizer)
+    else:
+        trial = 0
+        while os.path.exists(model_path + '{}'.format(trial)):
+            trial += 1
+        model_trial = model_path + '{}'.format(trial)
+    early_stopping = EarlyStopping(model_trial=model_trial, patience=args.early_stopping_epochs)
     # print characteristics
-    print('Model will be saved in {}'.format(model_root))
+    print('Model folder is {}'.format(model_trial))
     print('Training starts...')
     print('Train for {} epochs with {} early stopping epochs.'.format(args.epochs, args.early_stopping_epochs))
     print('learning rate is {} with exponential decay to {} of learning rate fraction every {} epochs.'.format(
@@ -80,16 +88,22 @@ def train_model(args):
     print('{} steps per epoch with {} samples per batch.'.format(len(train_loader), total_batch))
     print('logs every {} steps.'.format(logs_step))
     print('{} GPUs utilized.'.format(torch.cuda.device_count()))
-    writer = SummaryWriter(model_root + '/' + 'events/')
+    writer = SummaryWriter(model_trial + '/' + 'events/')
     global_step = 0
-    for epoch in range(args.epochs):  # loop over the dataset multiple times
+    for current_epoch in range(args.epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         running_f1_micro = 0.0
         running_f1_macro = 0.0
         running_f1_weighted = 0.0
         model.train()
         for train_step, train_data in enumerate(train_loader):  # step, batch
-            global_step = epoch * len(train_loader) + train_step + 1
+            if args.load_model:
+                # noinspection PyUnboundLocalVariable
+                global_step = loaded_epoch * len(train_loader) + train_step + 1
+                epoch = loaded_epoch + current_epoch
+            else:
+                epoch = current_epoch
+                global_step = epoch * len(train_loader) + train_step + 1
             optimizer.zero_grad()  # zero the parameter gradients
             train_inputs = train_data['input'].to(device)
             train_labels = train_data['label'].to(device)
@@ -108,10 +122,10 @@ def train_model(args):
             train_f1_macro = f1_macro(train_outputs, train_labels)
             train_f1_weighted = f1_weighted(train_outputs, train_labels)
 
-            running_loss += train_loss.item()
+            running_loss += train_loss
             running_f1_micro += train_f1_micro
-            running_f1_macro += train_f1_macro.item()
-            running_f1_weighted += train_f1_weighted.item()
+            running_f1_macro += train_f1_macro
+            running_f1_weighted += train_f1_weighted
 
             metrics = {'loss': running_loss / (train_step + 1),
                        'f1_micro': running_f1_micro / (train_step + 1),
@@ -120,12 +134,13 @@ def train_model(args):
                        'lr': scheduler.get_lr()[0]}
 
             if global_step % 50 == 0 or global_step == 1 or (global_step % (len(train_loader) // 2) == 0):
-                print('Train -->  Epoch: {0:3d}, Step: {1:5d} Loss: {2:.4f}'.format(epoch + 1, global_step,
+                print('Train -->  Epoch: {0:3d}, Step: {1:5d} Loss: {2:.3f}'.format(epoch + 1, global_step,
                                                                                     metrics['loss']))
-                print('           Background       Liver')
-                print('F1-micro: {} F1-macro: {}, (Dice) F1-weighted: {}%'.format(metrics['f1_micro'].cpu().numpy(),
-                                                                                  metrics['f1_macro'],
-                                                                                  metrics['f1_weighted'] * 100))
+                print('Background'.rjust(20, ' '), 'Liver'.rjust(6, ' '))
+                print('F1-micro: {0[0]:5.3f} {0[1]:11.3f}\nF1-macro: {1:10.3f}\nF1-weighted: {2:7.3f}'.format(
+                    metrics['f1_micro'],
+                    metrics['f1_macro'],
+                    metrics['f1_weighted']))
             if (global_step % (len(train_loader) // 2) == 0) or (global_step == 1):
                 metrics_writer(writer=writer, mode='train', input=train_inputs, onehot_label=train_labels,
                                output=train_outputs, metrics=metrics, model=model, global_step=global_step)
@@ -159,12 +174,14 @@ def train_model(args):
                                'f1_macro': running_f1_macro / (val_step + 1),
                                'f1_weighted': running_f1_weighted / (val_step + 1)}
 
-            print('Eval -->  Epoch: {0:3d}, Step: {1:5d} Loss: {2:.4f}'.format(epoch + 1, global_step,
+            # noinspection PyUnboundLocalVariable
+            print('Eval -->  Epoch: {0:3d}, Step: {1:5d} Loss: {2:.3f}'.format(epoch + 1, global_step,
                                                                                val_metrics['loss']))
-            print('           Background       Liver')
-            print('F1-micro: {} F1-macro: {}, (Dice) F1-weighted: {}%'.format(val_metrics['f1_micro'],
-                                                                              val_metrics['f1_macro'],
-                                                                              val_metrics['f1_weighted']))
+            print('Background'.rjust(20, ' '), 'Liver'.rjust(6, ' '))
+            print('F1-micro: {0[0]:5.3f} {0[1]:11.3f}\nF1-macro: {1:10.3f}\nF1-weighted: {2:7.3f}'.format(
+                val_metrics['f1_micro'],
+                val_metrics['f1_macro'],
+                val_metrics['f1_weighted']))
             checkpoint = {'epoch': epoch + 1,
                           'valid_loss_min': val_metrics['loss'],
                           'state_dict': model.state_dict(),
@@ -172,7 +189,7 @@ def train_model(args):
             metrics_writer(writer=writer, mode='eval', input=val_inputs, onehot_label=val_labels,
                            output=val_outputs, metrics=val_metrics, model=model, global_step=global_step)
 
-        early_stopping(val_metric=val_metrics['loss'], minimize=True, checkpoint=checkpoint, model_root=model_root, epoch=epoch)
+        early_stopping(val_metric=val_metrics['loss'], minimize=True, checkpoint=checkpoint, epoch=epoch)
         # noinspection PyArgumentList
         scheduler.step()
     writer.close()

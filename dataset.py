@@ -6,7 +6,7 @@ from glob import glob
 import pydicom as pd
 from cv2 import warpAffine, getRotationMatrix2D, flip, filter2D, GaussianBlur
 from config import paths
-from helper_fns import one_hot
+import torch.nn.functional as F
 
 
 def augm_fn(image, label):
@@ -126,6 +126,14 @@ class ChaosDataset(Dataset):
     def __len__(self):
         return len(self.samples)
 
+    def one_hot(self, indices):
+        """Convert a class-map label to one_hot label."""
+        indices = indices.to(torch.int64)
+        onehot_labels = F.one_hot(input=indices, num_classes=self.num_classes)
+        onehot_labels = onehot_labels.transpose(2, 0).to(torch.float32)
+        onehot_labels = onehot_labels.transpose(1, 2).to(torch.float32)
+        return onehot_labels
+
     def __getitem__(self, index):
         if torch.is_tensor(index):
             index = index.tolist()
@@ -157,7 +165,7 @@ class ChaosDataset(Dataset):
                 else:
                     label[label == torch.max(label)] = 2  # todo sanity check
                     label[label != torch.max(label) and label != torch.min(label)] = 1
-            onehot_label = one_hot(indices=label, num_classes=self.num_classes)
+            onehot_label = self.one_hot(indices=label)
             return {'input': image, 'label': onehot_label}
 
         if self.mode == 'infer':
@@ -171,11 +179,13 @@ class ChaosDataset(Dataset):
 def dataloader(mode, branch_to_train, num_classes, batch_size):
     if mode == 'eval':
         augmentations = None
-        shuffle = False
+        shuffle = True
     else:
         augmentations = augm_fn
-        shuffle = False
-    return DataLoader(ChaosDataset(mode=mode, branch_to_train=branch_to_train, num_classes=num_classes, transform=augmentations), batch_size=batch_size, shuffle=shuffle)
+        shuffle = True
+    return DataLoader(
+        ChaosDataset(mode=mode, branch_to_train=branch_to_train, num_classes=num_classes, transform=augmentations),
+        batch_size=batch_size, shuffle=shuffle)
 
 
 if __name__ == '__main__':

@@ -1,18 +1,6 @@
 import os
 import shutil
-import torch.nn.functional as F
 import torch
-
-
-def one_hot(indices, num_classes):
-    """Convert a class-map label to one_hot label."""
-    indices.require_grad = False
-    indices = indices.to(torch.int64)
-    onehot_labels = F.one_hot(input=indices, num_classes=num_classes)
-    onehot_labels = onehot_labels.transpose(2, 0).to(torch.float32)
-    onehot_labels = onehot_labels.transpose(1, 2).to(torch.float32)
-    onehot_labels.requires_grad = False
-    return onehot_labels
 
 
 # noinspection PyShadowingBuiltins
@@ -25,8 +13,8 @@ def metrics_writer(writer, mode, input, onehot_label, output, metrics, model, gl
     writer.add_images('{}/Label'.format(mode), torch.unsqueeze(onehot_label[0, :, :, :], 0), global_step=global_step)
     writer.add_images('{}/Output'.format(mode), torch.unsqueeze(output[0, :, :, :], 0), global_step=global_step)
     writer.add_scalars('Loss', {str(mode): metrics['loss']}, global_step=global_step)
-    writer.add_scalars('f1_micro-background', {mode: metrics['f1_micro'][0].cpu().numpy()}, global_step=global_step)
-    writer.add_scalars('f1_micro-liver', {mode: metrics['f1_micro'][1].cpu().numpy()}, global_step=global_step)
+    writer.add_scalars('f1_micro-background', {mode: metrics['f1_micro'][0]}, global_step=global_step)
+    writer.add_scalars('f1_micro-liver', {mode: metrics['f1_micro'][1]}, global_step=global_step)
     writer.add_scalars('f1_macro', {mode: metrics['f1_macro']}, global_step=global_step)
     writer.add_scalars('f1_weighted', {mode: metrics['f1_weighted']}, global_step=global_step)
     if mode == 'train':
@@ -74,7 +62,7 @@ def load_ckp(checkpoint_fpath, model, optimizer):
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
-    def __init__(self, patience=7, counter=0, delta=0):
+    def __init__(self, model_trial, patience=7, counter=0, delta=0, ):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -86,11 +74,12 @@ class EarlyStopping:
         self.counter = counter
         self.delta = delta
         self.metric_best = torch.tensor(-float('inf'))
+        self.model_trial = model_trial
 
-    def __call__(self, val_metric, minimize, checkpoint, model_root, epoch):
+    def __call__(self, val_metric, minimize, checkpoint, epoch):
         self.counter += 1
-        checkpoint_path = model_root + '/epoch_{}/checkpoint'.format(epoch)
-        best_model_path = model_root + '/best'
+        checkpoint_path = self.model_trial + '/epoch_{}/checkpoint'.format(epoch)
+        best_model_path = self.model_trial + '/best_model/best'
 
         if minimize:
             val_metric = -val_metric
