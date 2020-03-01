@@ -126,10 +126,10 @@ class ChaosDataset(Dataset):
     def __len__(self):
         return len(self.samples)
 
-    def one_hot(self, indices):
+    def one_hot(self, indices, num_classes):
         """Convert a class-map label to one_hot label."""
         indices = indices.to(torch.int64)
-        onehot_labels = F.one_hot(input=indices, num_classes=self.num_classes)
+        onehot_labels = F.one_hot(input=indices, num_classes=num_classes)
         onehot_labels = onehot_labels.transpose(2, 0).to(torch.float32)
         onehot_labels = onehot_labels.transpose(1, 2).to(torch.float32)
         return onehot_labels
@@ -153,20 +153,12 @@ class ChaosDataset(Dataset):
 
             # For binary classes
             if self.branch_to_train == 1:
-                if torch.max(label) == 0:
-                    pass
-                else:
-                    label[label != torch.max(label)] = 0
-                    label[label == torch.max(label)] = 1
-                # onehot_label = one_hot(indices=label, num_classes=self.num_classes)
+                num_classes = self.num_classes
+                label = label/255
             else:
-                if torch.max(label) == 0:
-                    pass
-                else:
-                    label[label == torch.max(label)] = 2  # todo sanity check
-                    label[label != torch.max(label) and label != torch.min(label)] = 1
-            onehot_label = self.one_hot(indices=label)
-            return {'input': image, 'label': onehot_label}
+                num_classes = self.num_classes ** 2 - self.num_classes + 1
+            onehot_label = self.one_hot(indices=label, num_classes=num_classes)
+            return {'input': image, 'label': onehot_label, 'ground_path': self.samples[index][1]}
 
         if self.mode == 'infer':
             image = pd.dcmread(self.samples[index]).pixel_array.astype(np.float)
@@ -182,7 +174,7 @@ def dataloader(mode, branch_to_train, num_classes, batch_size):
         shuffle = True
     else:
         augmentations = augm_fn
-        shuffle = True
+        shuffle = False
     return DataLoader(
         ChaosDataset(mode=mode, branch_to_train=branch_to_train, num_classes=num_classes, transform=augmentations),
         batch_size=batch_size, shuffle=shuffle)

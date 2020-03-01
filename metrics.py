@@ -16,9 +16,11 @@ class DiceScore(Module):
         output_nograd = output.detach()
         numerator = torch.sum(torch.mul(input=onehot_label, other=output_nograd), dim=[0, 2, 3])
         denominator = torch.sum(torch.add(input=output_nograd, other=onehot_label), dim=[0, 2, 3])
+
         # F1 micro
         if self.dice_type == 'micro':
             f1 = torch.div(torch.mul(numerator, 2.0), torch.add(denominator, eps))
+
         # F1 macro
         elif self.dice_type == 'macro':
             f1 = torch.div(2.0 * torch.sum(numerator), torch.sum(torch.add(denominator, eps)))

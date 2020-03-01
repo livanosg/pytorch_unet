@@ -23,7 +23,6 @@ class WeightedCrossEntropyLoss(Module):
         weights = torch.div(torch.sum(class_frequencies)-class_frequencies, torch.add(class_frequencies, 1))
         wce = torch.sum(weights * onehot_labels * torch.log(output + eps), dim=[0, 2, 3], keepdim=True)
         wce = - torch.sum(wce)/torch.sum(class_frequencies)
-        print(wce)
         # loss = F.binary_cross_entropy(output, onehot_labels) #, weight=weights)
         # print(loss)
         return wce
@@ -42,8 +41,6 @@ class WeightedDiceLoss(Module):
         numerator = torch.sum(torch.mul(torch.sum(torch.mul(output, onehot_label), dim=(0, 2, 3)), weights))
         denominator = torch.sum(torch.mul(torch.sum(onehot_label + output, dim=(0, 2, 3)), weights))
         loss = -torch.log(torch.mul(torch.div(numerator, denominator), 2.0))
-        print(loss)
-
         return loss
 
 
