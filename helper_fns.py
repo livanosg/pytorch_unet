@@ -62,7 +62,7 @@ def load_ckp(checkpoint_fpath, model, optimizer):
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
-    def __init__(self, model_trial, patience=7, counter=0, delta=0, ):
+    def __init__(self, model_path, patience=7, counter=0, delta=0, ):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -74,12 +74,12 @@ class EarlyStopping:
         self.counter = counter
         self.delta = delta
         self.metric_best = torch.tensor(-float('inf'))
-        self.model_trial = model_trial
+        self.model_path = model_path
 
-    def __call__(self, val_metric, minimize, checkpoint, epoch):
+    def __call__(self, val_metric, checkpoint, epoch, minimize):
         self.counter += 1
-        checkpoint_path = self.model_trial + '/epoch_{}/checkpoint'.format(epoch)
-        best_model_path = self.model_trial + '/best_model/best'
+        checkpoint_path = self.model_path + '/checkpoint{}'.format(epoch)
+        best_model_path = self.model_path + '/best'
 
         if minimize:
             val_metric = -val_metric

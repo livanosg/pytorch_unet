@@ -87,13 +87,13 @@ def datasets(mode, branch_to_train=1):
     only_paths -> yield only the paths of the data
     Outputs:
     A tuple of (dcm_image, grd_image) which is defined by the given arguments for a given dataset."""
-    dicom_paths = glob(paths[mode] + '/CT/**/DICOM_anon/*.dcm', recursive=True)  # Get DICOM-data paths for given mode
+    dicom_paths = glob(paths[mode] + '/**/CT/**/DICOM_anon/*.dcm', recursive=True)  # Get DICOM-data paths for given mode
     dicom_paths = sorted(dicom_paths)
     if mode in ('train', 'eval'):
         if branch_to_train == 1:
-            ground_paths = glob(paths[mode] + '/CT/**/Ground/*.png', recursive=True)
+            ground_paths = glob(paths[mode] + '/**/CT/**/Ground/*.png', recursive=True)
         elif branch_to_train == 2:
-            ground_paths = glob(paths[mode] + '/CT/**/Ground_2/*.png', recursive=True)
+            ground_paths = glob(paths[mode] + '/**/CT/**/Ground_2/*.png', recursive=True)
         else:
             return ValueError('Wrong branch value: %d' % branch_to_train)
         ground_paths = sorted(ground_paths)
@@ -168,7 +168,7 @@ class ChaosDataset(Dataset):
             return {'input': image}
 
 
-def dataloader(mode, branch_to_train, num_classes, batch_size):
+def dataloader(mode, branch_to_train, classes, batch_size):
     if mode == 'eval':
         augmentations = None
         shuffle = True
@@ -176,7 +176,7 @@ def dataloader(mode, branch_to_train, num_classes, batch_size):
         augmentations = augm_fn
         shuffle = False
     return DataLoader(
-        ChaosDataset(mode=mode, branch_to_train=branch_to_train, num_classes=num_classes, transform=augmentations),
+        ChaosDataset(mode=mode, branch_to_train=branch_to_train, num_classes=classes, transform=augmentations),
         batch_size=batch_size, shuffle=shuffle)
 
 
