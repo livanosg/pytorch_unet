@@ -1,7 +1,7 @@
 import torch
 from torch.nn import Module
 
-eps = torch.tensor(1e-20)
+eps = torch.tensor(1e-10)
 
 
 class WeightedCrossEntropyLoss(Module):
@@ -23,7 +23,6 @@ class WeightedCrossEntropyLoss(Module):
         weights = torch.div(torch.sum(class_frequencies) - class_frequencies, torch.add(class_frequencies, eps))
         wce = torch.sum(weights * onehot_labels * torch.log(output + eps))
         loss = torch.neg(torch.div(wce, torch.sum(class_frequencies)))
-        print(loss)
         return loss
 
 
@@ -43,7 +42,6 @@ class WeightedDiceLoss(Module):
 
         denominator = torch.sum(torch.mul(torch.sum(onehot_label + output, dim=(0, 2, 3)), weights))
         loss = torch.neg(torch.log(torch.div(2.0 * numerator, denominator)))
-        print(loss)
         return loss
 
 
